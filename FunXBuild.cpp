@@ -65,7 +65,7 @@ void FunReader::InputScript(const string & script){
 	_script = script;
 }
 bool FunReader::Finish(){
-	return _finish;
+	return (_finish&&c!=EOF);
 }
 //GetWord函数只有当c==EOF时才会读取下一字符
 int FunReader::GetWord(){
@@ -76,6 +76,9 @@ int FunReader::GetWord(){
 		if (c == EOF){
 			_finish = true;
 		}
+		//string a;
+		//a = c;
+		//cout << a;
 	}
 	else{
 		if (c == EOF){
@@ -83,7 +86,6 @@ int FunReader::GetWord(){
 				c = _script[_pointer++];
 			}
 			if (_pointer == _script.length()){
-				c = EOF;
 				_finish = true;
 			}
 		}
@@ -106,6 +108,9 @@ FunWord FunReader::SimpleNext(){
 	while (true){
 		temp = GetWord();
 		if (temp == EOF){
+			if (!buffer.empty()){
+				return FunWord(FUN_NAME, buffer);
+			}
 			return FunWord(FUN_NIL,"");
 		}
 		//宽字节处理
@@ -116,6 +121,9 @@ FunWord FunReader::SimpleNext(){
 			c = EOF;
 			continue;
 		}
+		//string a;
+		//a = temp;
+		//cout << a<<endl;
 		if (_signChar[temp]){
 			if (buffer.empty()){
 				buffer += temp;
@@ -133,14 +141,21 @@ FunWord FunReader::SimpleNext(){
 			}
 			else
 			{
-				return FunWord(FUN_STR, buffer);
+				return FunWord(FUN_NAME, buffer);
 			}
-			break;
 		}
 		else{
 			buffer += temp;
+			//string a;
+			//a = temp;
+			//cout << a<<endl;
 			c = EOF;
 		}
+	}
+
+	//万无一失
+	if (!buffer.empty()){
+		return FunWord(FUN_NAME, buffer);
 	}
 	//大概思路是返回NIL后再用Finish()检测是否为结尾
 	//cout << buffer << endl;
@@ -173,11 +188,20 @@ FunWord FunReader::Next(){
 				}
 				continue;
 			}
-			return word;
+			if (word.word == "\""){
+				//字符串处理
+				string temp_buffer;
+				while ((word = SimpleNext()).word != "\""){
+					if (word.type == FUN_NIL)return word;
+					temp_buffer += word.word;
+				}
+				return FunWord(FUN_STR, temp_buffer);
+				continue;
+			}
 			//比如负数，小数要特别处理
 		}
 		else
-			if (word.type == FUN_STR){
+			if (word.type == FUN_NAME){
 				return word;
 			}
 			else
@@ -208,5 +232,6 @@ int FunBuild::Build(){
 		}
 		test.push_back(word);
 	}
+	word = currentReader->Next();
 	return 0;
 }
