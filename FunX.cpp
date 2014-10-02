@@ -9,20 +9,24 @@ FunX::~FunX(){
 int FunX::DoString(string str){
 	//cout << "开始分析：" << str<<endl;
 	//cout << "-------------------------"<<endl;
-	reader.InputScript(str);
+	funBuild.SetScript(str);
 	Run();
 	return 0;
 }
 
 int FunX::DoFile(string filename){
 	cout << "读取文件：" << filename << endl;
+	/*
+	FunReader reader;
 	reader.InputFile(filename);
 	vector<FunWord> test;
 	while (!reader.Finish()){
-		FunWord w = reader.Next();
-		test.push_back(w);
-		cout << w.word << endl;
+	FunWord w = reader.Next();
+	test.push_back(w);
+	cout << w.word << endl;
 	}
+	*/
+	funBuild.SetFile(filename);
 	Run();
 	return 0;
 }
