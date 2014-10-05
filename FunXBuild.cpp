@@ -2,6 +2,7 @@
 
 bool FunReader::_signIndex[256][256];
 bool FunReader::_signChar[256];
+char FunReader::_signLevel[256];
 vector<string> FunReader::_signTable;
 
 FunReader::FunReader(){
@@ -19,7 +20,7 @@ FunReader::FunReader(){
 			"==", "!=", ">=", "<=", ">", "<",
 			"(", ")", "{", "}", "[", "]",
 			";", "&", "?", ":", "\"", "\'"
-			" ", "\n", "\t","/*", "*/","//", "."
+			" ", "\n", "\t", "/*", "*/", "//", ".", "`"
 		};
 
 		/*
@@ -48,6 +49,18 @@ FunReader::FunReader(){
 				_signIndex[word[0]][word[1]] = true;
 			} 
 		}
+
+		_signLevel['+'] = 10;
+		_signLevel['-'] = 10;
+		_signLevel['*'] = 20;
+		_signLevel['/'] = 20;
+		_signLevel['^'] = 30;
+		_signLevel['%'] = 30;
+		_signLevel['='] = 5;
+		_signLevel['>'] = 8;
+		_signLevel['<'] = 8;
+		_signLevel['!'] = 8;
+		_signLevel['('] = 6;
 	}
 }
 FunReader::~FunReader(){
@@ -135,6 +148,7 @@ FunWord FunReader::SimpleNext(){
 						c = EOF;
 					}
 					else{
+						if (buffer == "`") return FunWord(FUN_NAME, "0");
 						return FunWord(FUN_TOKEN, buffer);
 					}
 				}
@@ -163,14 +177,19 @@ FunWord FunReader::SimpleNext(){
 }
 
 FunWord FunReader::Next(){
+	//return SimpleNext();
 	//简单分析Reader
-	FunWord word;
 	while (true){
-		word = SimpleNext();
+		if (!is_new){
+			word = SimpleNext();
+		}
+		else
+			is_new = false;
+
 		if (word.type == FUN_NIL){
 			return word;
 		}
-		if (word.word == " "||word.word=="\n"||word.word=="\t"){
+		if (word.word == " " || word.word == "\n" || word.word == "\t" || word.word == ";"){
 			continue;
 		}
 		if (word.type == FUN_TOKEN){
@@ -198,11 +217,29 @@ FunWord FunReader::Next(){
 				return FunWord(FUN_STR, temp_buffer);
 				continue;
 			}
+			//为了避免二义性，纯负数用`- Number 表示,其实就是将`视为0
+
+			//普通TOKEN返回
+			return word;
 			//比如负数，小数要特别处理
 		}
 		else
 			if (word.type == FUN_NAME){
-				return word;
+				//判断是否数字,按照语法规定，第一位是数字的必为数字\
+				//暂时不检测是否语法错误
+				char c = word.word[0];
+				if (c<'0'||c>'9')return word;
+				string num = word.word;
+				word = SimpleNext();
+				if (word.word == "."){
+					num += word.word + SimpleNext().word;//获取小数部分，暂不支持科学计数法
+					return FunWord(FUN_NUM, num);
+				}
+				else
+				{
+					is_new = true;
+					return FunWord(FUN_NUM, num);
+				}
 			}
 			else
 				if (word.type == FUN_NIL){
@@ -210,6 +247,12 @@ FunWord FunReader::Next(){
 				}
 	}
 	return word;
+}
+
+char FunReader::GetLevel(FunWord word){
+	char level = _signLevel[word.word[0]];
+	if (word.word.length() != 1)level *= 8;
+	return level;
 }
 
 int FunBuild::SetScript(const string & script){
@@ -225,13 +268,41 @@ int FunBuild::SetFile(const string & filename){
 int FunBuild::Build(){
 	FunWord word;
 	vector<FunWord> test;
+
+	stack<FunWord> opStack;
+
 	while (!currentReader->Finish()){
 		word = currentReader->Next();
 		if (word.type == FUN_NIL){
 			break;
 		}
+		/*
+		if (word.type != FUN_TOKEN){
+			test.push_back(word);
+		}
+		else{
+			if (opStack.empty()){
+				opStack.push(word);
+			}
+			else{
+				if (currentReader->GetLevel(opStack.top()) >= currentReader->GetLevel(word)){
+					while (!opStack.empty()){
+						test.push_back(opStack.top());
+						opStack.pop();
+					}
+				}
+				else
+					opStack.push(word);
+			}
+		}*/
 		test.push_back(word);
 	}
+
+	while (!opStack.empty()){
+		test.push_back(opStack.top());
+		opStack.pop();
+	}
+
 	word = currentReader->Next();
 	return 0;
 }
