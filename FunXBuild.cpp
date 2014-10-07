@@ -2,8 +2,10 @@
 
 bool FunReader::_signIndex[256][256];
 bool FunReader::_signChar[256];
-char FunReader::_signLevel[256];
 vector<string> FunReader::_signTable;
+
+bool FunBuild::_staticOK;
+unsigned char FunBuild::_signLevel[256][256];
 
 FunReader::FunReader(){
 	_finish = false;
@@ -49,23 +51,52 @@ FunReader::FunReader(){
 				_signIndex[word[0]][word[1]] = true;
 			} 
 		}
-
-		_signLevel['+'] = 10;
-		_signLevel['-'] = 10;
-		_signLevel['*'] = 20;
-		_signLevel['/'] = 20;
-		_signLevel['^'] = 30;
-		_signLevel['%'] = 30;
-		_signLevel['='] = 5;
-		_signLevel['>'] = 8;
-		_signLevel['<'] = 8;
-		_signLevel['!'] = 8;
-		_signLevel['('] = 6;
 	}
 }
 FunReader::~FunReader(){
 	if (_isfile)fclose(_fin);
 }
+
+FunBuild::FunBuild(){
+	if (!_staticOK){
+
+		memset(_signLevel, 0, sizeof(_signLevel));
+
+		SetSignLevel("+", 10);
+		SetSignLevel("-", 10);
+		SetSignLevel("*", 11);
+		SetSignLevel("/", 11);
+		SetSignLevel("^", 13);
+		SetSignLevel("%", 10);
+		SetSignLevel("=", 5);
+		SetSignLevel(">", 8);
+		SetSignLevel("<", 8);
+		SetSignLevel("(", 0);
+
+		_staticOK = true;
+	}
+}
+
+FunBuild::~FunBuild(){
+
+}
+
+void FunBuild::SetSignLevel(const string & name, unsigned char level){
+	int s = 0;
+	if (name.length()>1){
+		s = name[1];
+	}
+	_signLevel[name[0]][s] = level;
+}
+
+unsigned char FunBuild::GetSignLevel(const string & name){
+	int s = 0;
+	if (name.length()>1){
+		s = name[1];
+	}
+	return _signLevel[name[0]][s];
+}
+
 void FunReader::InputFile(const string & filename){
 	_isfile = true;
 	c = EOF;
@@ -189,9 +220,14 @@ FunWord FunReader::Next(){
 		if (word.type == FUN_NIL){
 			return word;
 		}
-		if (word.word == " " || word.word == "\n" || word.word == "\t" || word.word == ";"){
+
+		if (word.word == " " || word.word == "\t"){
 			continue;
 		}
+		if (word.word == "\n" || word.word == ";"){
+			return FunWord(FUN_NEXT, "");
+		}
+
 		if (word.type == FUN_TOKEN){
 			if (word.word == "/*"){
 				/*Ìø¹ý×¢ÊÍ*/
@@ -249,12 +285,6 @@ FunWord FunReader::Next(){
 	return word;
 }
 
-char FunReader::GetLevel(FunWord word){
-	char level = _signLevel[word.word[0]];
-	if (word.word.length() != 1)level *= 8;
-	return level;
-}
-
 int FunBuild::SetScript(const string & script){
 	currentReader = new FunReader;
 	currentReader->InputScript(script);
@@ -265,19 +295,33 @@ int FunBuild::SetFile(const string & filename){
 	currentReader->InputFile(filename);
 	return Build();
 }
+void FunBuild::PopOPStack(stack<FunWord> & opStack, vector<FunWord> & RStack,const string tag /* = "" */){
+	while (!opStack.empty()){
+		if (opStack.top().word == tag){
+			opStack.pop();
+			break;
+		}
+		RStack.push_back(opStack.top());
+		opStack.pop();
+	}
+}
+
 int FunBuild::Build(){
 	FunWord word;
 	vector<FunWord> test;
 
 	stack<FunWord> opStack;
-
 	while (!currentReader->Finish()){
 		word = currentReader->Next();
 		if (word.type == FUN_NIL){
 			break;
 		}
-		/*
+
 		if (word.type != FUN_TOKEN){
+			if (word.type == FUN_NEXT){
+				PopOPStack(opStack, test);
+			}
+			//Ñ¹ÈëÆÕÍ¨×Ö·û
 			test.push_back(word);
 		}
 		else{
@@ -285,23 +329,28 @@ int FunBuild::Build(){
 				opStack.push(word);
 			}
 			else{
-				if (currentReader->GetLevel(opStack.top()) >= currentReader->GetLevel(word)){
-					while (!opStack.empty()){
-						test.push_back(opStack.top());
-						opStack.pop();
-					}
-				}
-				else
+				if (word.word=="("){
 					opStack.push(word);
+					continue;
+				}
+				if (word.word==")"){
+					PopOPStack(opStack, test, "(");
+					continue;
+				}
+
+				while (!opStack.empty() && GetSignLevel(opStack.top().word)>=GetSignLevel(word.word)){
+					test.push_back(opStack.top());
+					opStack.pop();
+				}
+
+				opStack.push(word);
+
 			}
-		}*/
-		test.push_back(word);
+		}
+		//test.push_back(word);
 	}
 
-	while (!opStack.empty()){
-		test.push_back(opStack.top());
-		opStack.pop();
-	}
+	PopOPStack(opStack, test);
 
 	word = currentReader->Next();
 	return 0;

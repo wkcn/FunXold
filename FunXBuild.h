@@ -17,7 +17,6 @@ private:
 
 	static bool _signIndex[256][256];
 	static bool _signChar[256];
-	static char _signLevel[256];
 
 	static vector<string> _signTable;
 	int c;
@@ -26,13 +25,12 @@ private:
 	int GetWord();
 	FunWord SimpleNext();
 	bool Match(const string & str, const int &temp);
-	
+
 public:
 	void InputFile(const string & filename);
 	void InputScript(const string & script);
 	bool Finish();
 	FunWord Next();
-	char GetLevel(FunWord word);
 
 	FunReader();
 	~FunReader();
@@ -43,9 +41,17 @@ public:
 class FunBuild{
 private:
 	FunReader *currentReader;
-	
+	static unsigned char _signLevel[256][256];
+	static bool _staticOK;
+
+	void SetSignLevel(const string & name, unsigned char level);
+	unsigned char GetSignLevel(const string & name);
+	void PopOPStack(stack<FunWord> & opStack, vector<FunWord> & RStack,const string tag = "");
 public:
 	int SetFile(const string & filename);
 	int SetScript(const string & script);
 	int Build();
+
+	FunBuild();
+	~FunBuild();
 };

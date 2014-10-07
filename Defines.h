@@ -25,7 +25,8 @@ enum FunWordType{
 	FUN_NAME,
 	FUN_FACTOR,
 	FUN_SIGN,
-	FUN_TOKEN
+	FUN_TOKEN,
+	FUN_NEXT
 };
 
 //FunX中，数值和字符串是分开计算的
